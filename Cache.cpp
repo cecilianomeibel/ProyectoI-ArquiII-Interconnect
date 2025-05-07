@@ -35,4 +35,14 @@ public:
             std::cout << "Cache[" << i << "] = " << cacheLines[i] << std::endl;
         }
     }
+
+    void invalidateLineByAddress(int address) {
+    int blockIndex = (address / blockSize) % cacheLines.size();
+    if (cacheLines[blockIndex] == address) {
+        cacheLines[blockIndex] = -1;  // Invalidar
+        std::cout << "[CACHE] Línea " << blockIndex
+                  << " invalidada para dirección 0x" << std::hex << address << std::dec << "\n";
+    }
+}
+
 };

@@ -3,6 +3,8 @@
 #include <thread>
 #include <atomic>
 #include "Cache.cpp"
+#include "interprete.cpp"
+
 
 class Procesador {
 private:
@@ -19,12 +21,15 @@ private:
     std::thread hilo;          // El hilo que ejecutará el procesador
     std::atomic<bool> activo;  // Para controlar el ciclo de vida del hilo
 
+
     void run() {
         // Ejecución de las instrucciones
         while (activo) {
             // Agregar la lógica para ejecutar instrucciones
         }
+       
     }
+
 
 public:
     Procesador() : tiempoActual(0), activo(true) {
@@ -42,16 +47,16 @@ public:
                 READ_MEM(instr.src, instr.addr, instr.size, instr.qos); 
                 break;
             case 2: // BROADCAST_INVALIDATE 
-                BROADCAST_INVALIDATE(instr.src, instr.num_of_cache_lines, instr.qos); 
+                //BROADCAST_INVALIDATE(instr.src, instr.num_of_cache_lines, instr.qos); 
                 break;
             case 3:  // INV_ACK 
                 INV_ACK(instr.src, instr.qos);
                 break;
             case 4: // INV_COMPLETE 
-                INV_COMPLETE(instr.dest, instr.qos);
+                //INV_COMPLETE(instr.dest, instr.qos);
                 break;
             case 5: // READ_RESP 
-                READ_RESP(instr.dest,instr.data, instr);
+                READ_RESP(instr.dest,instr.data, instr.qos);
                 break;
             case 6: // WRITE_RESP
                 WRITE_RESP(instr.dest, instr.status, instr.qos);
@@ -150,12 +155,40 @@ public:
     //---------------
 
     void INV_ACK(uint8_t src, uint8_t qos) {
-        tiempoActual += ciclosInvAck;
         std::cout << "Respuesta de invalidación recibida desde PE #" << (int)src
-                  << " con QoS: " << (int)qos
-                  << " => Tiempo: " << tiempoActual << " ciclos\n";
+        << " con QoS: " << (int)qos << " Tiempo: " << tiempoActual << " ciclos\n";
+        tiempoActual += ciclosInvAck;
     }
 
+    //--------------------
+    //FUNCION READ_RESP
+    //--------------------
+
+    void READ_RESP(uint8_t dest, uint32_t data, uint8_t qos) {
+        std::cout << "[READ_RESP] Recibiendo datos desde memoria para PE #" << (int)dest
+        << " desde dirección 0x" << std::hex << data
+        << " con QoS: " << (int)qos << "\n";
+
+        // Simula que estos datos (1 bloque) llegan desde memoria y se almacenan en caché
+        uint32_t blockSize = cache.getBlockSize();
+        tiempoActual += ciclosTransferenciaPorByte * blockSize;
+        cache.access(data);  // Asume que se ha accedido/cargado el bloque
+        std::cout << "[READ_RESP] Datos almacenados en la caché. Tiempo total: "
+        << tiempoActual << " ciclos\n";
+    }
+
+    //---------------------
+   //FUNCION WRITE_RESP
+  //---------------------
+
+    void WRITE_RESP(uint8_t dest, uint8_t status, uint8_t qos) {
+        std::string estado = (status == 0x1) ? "OK" : "NOT_OK";
+        std::cout << "[WRITE_RESP] Respuesta a escritura recibida por PE #" << (int)dest
+        << " => estado: " << estado
+        << " (0x" << std::hex << (int)status << "), QoS: " << (int)qos
+        << " => Tiempo: " << tiempoActual << " ciclos\n";
+        tiempoActual += 5; // 5 ciclos por procesar la respuesta
+    }
 
 
     uint64_t getTiempoActual() const {
@@ -170,6 +203,11 @@ public:
         tiempoActual = 0;
     }
 
+    void invalidateLine(uint64_t address) {
+    cache.invalidateLineByAddress(address);
+    }
+
+
     // Detener el procesador y unir el hilo al final
     void detener() {
         activo = false;
@@ -178,11 +216,27 @@ public:
         }
     }
 
+
     //Cerrar el hilo
     ~Procesador() {
         detener();
-    }
+    }  
+
 };
 
 
+ int main() {
+    instruction* program = interpretate("code_test.txt");
+    int count = 16;
+    Procesador cpu;
 
+    for (int i = 0; i < count; ++i) {
+        cpu.ejecutarInstruccion(program[i]);
+    }
+
+    return 0;
+}
+
+
+
+  
