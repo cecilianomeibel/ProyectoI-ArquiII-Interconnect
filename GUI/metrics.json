@@ -1,0 +1,11 @@
+{
+    "PE0": {"bandwidth": 120, "traffic": 3000, "latency": 12},
+    "PE1": {"bandwidth": 98, "traffic": 2800, "latency": 14},
+    "PE2": {"bandwidth": 110, "traffic": 3100, "latency": 10},
+    "PE3": {"bandwidth": 130, "traffic": 3300, "latency": 11},
+    "PE4": {"bandwidth": 100, "traffic": 2900, "latency": 13},
+    "PE5": {"bandwidth": 105, "traffic": 3000, "latency": 12},
+    "PE6": {"bandwidth": 115, "traffic": 3200, "latency": 11},
+    "PE7": {"bandwidth": 125, "traffic": 3400, "latency": 2}
+  }
+  
