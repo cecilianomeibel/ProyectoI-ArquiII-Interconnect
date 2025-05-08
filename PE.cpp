@@ -10,6 +10,24 @@
 #include "clk/shared.hpp"
 #include "interconnect/interconnect.hpp"
 
+
+/**
+ * @file Procesador.cpp
+ * @brief Implementación de un procesador simulado (PE) que ejecuta instrucciones en base a un archivo interpretado.
+ *        Cada procesador contiene su propio hilo de ejecución, caché y tiempos simulados para eventos como cache hit, miss,
+ *        transferencias de memoria, broadcasts, invalidaciones, y escritura/lectura en memoria.
+ *
+ * Instrucciones válidas son:
+ *   - WRITE_MEM src, addr, num_lines, start_line, qos
+ *   - READ_MEM src, addr, size, qos
+ *   - BROADCAST_INVALIDATE src, cache_line, qos
+ *   - INV_ACK src, qos
+ *   - INV_COMPLETE dest, qos  (no implementada en este archivo)
+ *   - READ_RESP dest, data, qos
+ *   - WRITE_RESP dest, status, qos
+ *
+ */
+
 class Procesador {
 private:
     uint64_t tiempoActual;  // tiempo simulado (en ciclos)
@@ -56,12 +74,21 @@ public:
         hilo = std::thread(&Procesador::run, this);
     }
 
-    // Método para agregar instrucciones 
+
+
+   /**
+   *@brief Agrega una instrucción a la cola del procesador.
+   * @param instr: Instrucción a ejecutar */
+
     void agregarInstruccion(const instruction& instr) {
         colaInstrucciones.push(instr);
     }
 
-    // Método que ejecuta una instrucción 
+
+    /**
+    * @brief Ejecuta la instrucción recibida según su opcode.
+    * @param instr: Instrucción a ejecutar*/
+
     void ejecutarInstruccion(const instruction& instr) {
         switch (instr.opcode) {
             case 0: // WRITE_MEM
@@ -91,7 +118,12 @@ public:
         }
     }
 
-    //Simular acceso a memoria
+
+    /**
+    * @brief Simula el acceso a la memoria con latencias de HIT o MISS.
+    * @param direccion: Dirección de memoria a acceder.
+    * @param tam: Tamaño de los datos a acceder en bytes.
+    * @param tipo: Tipo de operación ("READ", "WRITE"....).*/
 
     void manejarAccesoMemoria(uint64_t direccion, uint32_t tam, const std::string& tipo) {
         bool hit = cache.access(direccion);
@@ -107,6 +139,11 @@ public:
                       << " => Tiempo: " << tiempoActual << " ciclos\n";
         }
     } 
+
+
+    /**
+    * @brief Ejecuta una espera simulada basada en el reloj de simulación.
+    * @param time: Número de ciclos de reloj que debe esperar*/
 
     void exec_waiting(uint64_t time){
         int count = 0;
@@ -125,6 +162,14 @@ public:
     //-----------------
     //FUNCION WRITE_MEM   
     //-----------------
+
+    /**
+    * @brief Maneja una instrucción WRITE_MEM, simulando el acceso al caché y escritura a memoria.
+    * @param src: Identificador del PE origen.
+    * @param addr: Dirección de memoria donde se escribe.
+    * @param numOfCacheLines: Cantidad de líneas de caché a escribir.
+    * @param startCacheLine: Linea de cache en la que se inicia a escribir
+    * @param qos: Prioridad*/
 
     void WRITE_MEM(uint8_t src, uint64_t addr, uint32_t numOfCacheLines, uint32_t startCacheLine, uint8_t qos) {
         Interconnect::getInstance().write_mem(src, addr, numOfCacheLines, startCacheLine, qos);
@@ -164,6 +209,14 @@ public:
     //FUNCION READ_MEM
     //-----------------
 
+    /**
+    * @brief Maneja una instrucción READ_MEM, simulando lectura desde memoria con caché.
+    * @param src: Identificador del PE origen.
+    * @param addr: Dirección de memoria a leer.
+    * @param size: Tamaño de los datos a leer (en bytes).
+    * @param qos: Prioridad
+    */
+
     void READ_MEM(uint8_t src, uint64_t addr, uint32_t size, uint8_t qos) {
         Interconnect::getInstance().read_mem(src, addr, size, qos);
         std::cout << "[READ_MEM] PE #" << (int)src
@@ -200,6 +253,13 @@ public:
     //----------------------------
     //FUNCION BROADCAST_INVALIDATE
     //----------------------------
+
+    /**
+    * @brief Envía un broadcast para invalidar una línea de caché en todos los procesadores.
+    * @param src: Identificador del PE origen.
+    * @param cache_line: Línea de caché a invalidar.
+    * @param qos: Prioridad.*/
+
     void BROADCAST_INVALIDATE(uint8_t src, uint32_t cache_line, uint8_t qos) {
         Interconnect::getInstance().broadcast_invalidate(src, cache_line, qos);
         std::cout << "[BROADCAST_INVALIDATE] PE #" << (int)src 
@@ -219,6 +279,11 @@ public:
     //---------------
     //FUNCION INV_ACK
     //---------------
+    
+    /**
+    * @brief Procesa una respuesta de invalidación (ACK) desde otro procesador.
+    * @param src: Identificador del PE que responde.
+    * @param qos: Prioridad.*/
 
     void INV_ACK(uint8_t src, uint8_t qos) {
         Interconnect::getInstance().inv_ack(src, qos);
@@ -228,9 +293,16 @@ public:
         exec_waiting(ciclosInvAck);
     }
 
+
     //--------------------
     //FUNCION READ_RESP
     //--------------------
+
+    /**
+    * @brief Simula la recepción de datos desde memoria hacia la caché del PE.
+    * @param dest: Identificador del PE destino.
+    * @param data: Dirección de los datos que se almacenan.
+    * @param qos: Prioridad.*/
 
     void READ_RESP(uint8_t dest, uint32_t data, uint8_t qos) {
         std::cout << "[READ_RESP] Recibiendo datos desde memoria para PE #" << (int)dest
@@ -246,9 +318,14 @@ public:
         << tiempoActual << " ciclos\n";
     }
 
-    //---------------------
-   //FUNCION WRITE_RESP
-  //---------------------
+     //---------------------
+    //FUNCION WRITE_RESP
+   //---------------------
+   /**
+   * @brief Procesa la respuesta de una operación de escritura.
+   * @param dest: PE destino.
+   * @param status: Estado de la operación (OK, NOT_OK).
+   * @param qos: Prioridad */
 
     void WRITE_RESP(uint8_t dest, uint8_t status, uint8_t qos) {
         std::string estado = (status == 0x1) ? "OK" : "NOT_OK";
@@ -261,22 +338,39 @@ public:
     }
 
 
+    /**
+    * @brief Obtiene el tiempo simulado actual del procesador.
+    * @return Tiempo actual en ciclos.*/
 
     uint64_t getTiempoActual() const {
         return tiempoActual;
     }
 
+    /**
+    * @brief Imprime el estado de la caché del procesador*/
+
     void printCache() const {
         cache.printCache();
     }
+
+    /**
+    * @brief Reinicia el tiempo simulado a cero*/
 
     void resetTiempo() {
         tiempoActual = 0;
     }
 
+    /**
+    * @brief Invalida una línea de caché dada su dirección.
+    * @param address: Dirección de memoria asociada a la línea a invalidar*/
+
     void invalidateLine(uint64_t address) {
         cache.invalidateLineByAddress(address);
     }
+
+
+    /**
+    * @brief Detiene el hilo de ejecución del procesador*/
 
     void detener() {
         activo = false;
@@ -285,6 +379,10 @@ public:
             hilo.join();
         }
     }
+
+
+    /**
+    * @brief Destructor del procesador. Asegura que el hilo se detiene limpiamente.*/
 
     ~Procesador() {
         detener();

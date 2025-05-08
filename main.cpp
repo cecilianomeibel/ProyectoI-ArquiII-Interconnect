@@ -17,6 +17,7 @@ int main()
     Procesador pe5;
     Procesador pe6;
     Procesador pe7;
+    Interconnect::getInstance().set_scheduler(1); //1 = FIFO, 2 = PRIORITY
     for (int i = 0; i < size; ++i) {
         switch (program[i].src){
         case 0:

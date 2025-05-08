@@ -1,5 +1,26 @@
+/**
+ * @file interprete.cpp
+ * @brief Módulo para interpretar un archivo de texto con instrucciones de múltiples procesadores (PEs).
+ *        Cada línea puede ser una instrucción o una declaración de PE y QoS. Convierte el contenido
+ *        del archivo en un arreglo dinámico de estructuras `instruction`.
+ *
+ * Estructura admitida en el archivo:
+ *   PE<número> <QoS>
+ *   <instrucción> <parámetros separados por coma>
+ * 
+ * Las instrucciones válidas son:
+ *   - WRITE_MEM addr, num_lines, start_line
+ *   - READ_MEM addr [, size]
+ *   - BROADCAST_INVALIDATE cache_line
+ *   - INV_ACK
+ *   - INV_COMPLETE dest
+ *   - READ_RESP dest, data
+ *   - WRITE_RESP dest, status
+ */
 #include "interprete.hpp"
-
+/// @brief Analiza y devuelve el código numérico de una instrucción textual.
+/// @param text Cadena de texto que representa la instrucción completa.
+/// @return Un número entero identificando la instrucción, o EXIT_FAILURE si no es válida.
 int analicer_opcode(char *text){
         char text_op[32];
         const char* operations[] = {
@@ -28,7 +49,15 @@ int analicer_opcode(char *text){
         return EXIT_FAILURE;
 }
 
-
+/**
+ * @brief Parsea una línea de instrucción y rellena una estructura `instruction`.
+ * 
+ * @param line Línea de texto con la instrucción y sus parámetros (modificada internamente con strtok).
+ * @param inst Puntero a la estructura `instruction` que se llenará con los datos extraídos.
+ * 
+ * Se utiliza `strtok()` para dividir la línea en tokens. El campo `opcode` determina
+ * qué parámetros deben interpretarse y almacenarse.
+ */
 void parse_instruction(char* line, instruction* inst){
     char* token = strtok(line," \n"); //De la linea saca la primer palabra, es decir la funcion (op)
     if(!token) return; //Verificar que hay opcode
@@ -74,7 +103,16 @@ void parse_instruction(char* line, instruction* inst){
 
 
 }
-
+/**
+ * @brief Carga y analiza un archivo de texto con instrucciones formateadas, generando un arreglo dinámico de instrucciones.
+ * 
+ * @param path Ruta al archivo que contiene las instrucciones.
+ * @param size Puntero a entero donde se guardará la cantidad de instrucciones leídas exitosamente.
+ * @return Puntero a un arreglo dinámico de estructuras `instruction`, o nullptr si hubo error de lectura o de memoria.
+ * 
+ * El arreglo devuelto debe ser liberado con `free()` después de usarse.
+ * Esta función puede manejar archivos con más de 32 instrucciones, realocando memoria automáticamente.
+ */
 instruction *interpretate(const char* path, int* size){
 
     FILE* fp = std::fopen(path,"r");
@@ -82,7 +120,7 @@ instruction *interpretate(const char* path, int* size){
     if(!fp){
         std::perror("Opening file failed");
     }
-    instruction *instructions = (instruction*)malloc(32 * sizeof(instruction)); //esta forma pide la memoria necesaria para la lista de instrucciones.
+    instruction *instructions = (instruction*)malloc(128 * sizeof(instruction)); //esta forma pide la memoria necesaria para la lista de instrucciones.
     //instruction instructions[32]; 
     if (!instructions)
     {
