@@ -1,11 +1,11 @@
 #include <iostream>
 #include <bits/stdc++.h>
 #include <queue>
-#include "msg.h"
+#include "msg.hpp"
 
 struct CompareQoS {
     bool operator()(const msg& a, const msg& b) const {
-        return a.QoS < b.QoS;  // (mayor QoS primero)
+        return a.qos < b.qos;  // (mayor QoS primero)
     }
 };
 

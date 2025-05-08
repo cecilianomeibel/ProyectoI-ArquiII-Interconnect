@@ -1,27 +1,18 @@
 #include <iostream>
 #include <cstdint>
-#include "interconnect/FIFO.cpp"
-#include "interconnect/Priority.cpp"
+#include "interconnect/interconnect.hpp"
 
 int main(int argc, char const *argv[])
 {
-    FIFO fifo;
-    Priority priority;
-    for (uint32_t i = 0; i < 5; i++)
-    {
-        fifo.addMsg({1, i});
-        priority.addMsg({1, i});
-    }
+    Interconnect interconnect;
+    interconnect.WRITE_MEM(1,1,1,1);
+    interconnect.WRITE_MEM(2,2,2,2);
+    interconnect.WRITE_MEM(1,1,1,3);
+    interconnect.WRITE_MEM(1,1,1,4);
 
-    for (int i = 0; i < 5; i++){
-        std::cout << "Mensaje FIFO: " << fifo.getMsg().QoS << ", ";
-    }
-
-    std::cout << std::endl;
-    for (int i = 0; i < 5; i++){
-        std::cout << "Mensaje Priority: " << priority.getMsg().QoS << ", ";
-    }
-    std::cout << std::endl;
-
+    //Mover los calendarizadores a publicos en interconnect.cpp para pruebas.
+    /*for(int i=0; i < 4; i++){
+        std::cout << "Mensaje FIFO: " << std::dec << (int)interconnect.fifo.getMsg().qos << std::endl;
+    }*/
     return 0;
 }

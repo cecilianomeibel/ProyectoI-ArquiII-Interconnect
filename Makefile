@@ -1,32 +1,29 @@
-# Compilador
+# Makefile
+
 CXX = g++
+CXXFLAGS = -Wall -std=c++20 -Iinterconnect
 
-# Flags de compilación
-CXXFLAGS = -std=c++20 -Wall -Wextra
-
-# Directorios
-INCLUDES = -I.
-
-# Archivos fuente
-SRCS = main.cpp interconnect/FIFO.cpp interconnect/Priority.cpp
-
-# Archivos objeto
-OBJS = $(SRCS:.cpp=.o)
-
-# Ejecutable
 TARGET = main
+OBJDIR = bin
+MAIN = main.cpp
+MAIN_OBJ = $(OBJDIR)/main.o
 
-# Regla principal
-all: $(TARGET)
+INTERCONNECT_OBJS = $(OBJDIR)/interconnect.o \
+                    $(OBJDIR)/FIFO.o \
+                    $(OBJDIR)/Priority.o
 
-# Compilación del ejecutable
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
+all: $(OBJDIR) $(INTERCONNECT_OBJS) $(MAIN_OBJ)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(MAIN_OBJ) $(INTERCONNECT_OBJS)
 
-# Cómo compilar .cpp en .o con inclusión de headers
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+$(MAIN_OBJ): $(MAIN)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Limpiar archivos generados
+$(INTERCONNECT_OBJS):
+	$(MAKE) -C interconnect
+
+$(OBJDIR):
+	mkdir -p $(OBJDIR)
+
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJDIR)/*.o 
+	$(MAKE) -C interconnect clean

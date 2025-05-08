@@ -1,6 +1,6 @@
 #include <iostream>
 #include <bits/stdc++.h>
-#include "msg.h"
+#include "msg.hpp"
 
 class FIFO {
     private:
