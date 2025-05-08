@@ -2,6 +2,9 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <map>
+#include <vector>
+
 
 struct instruction {
     int opcode;// 0: WRITE_MEM, 1: READ_MEM, etc.
@@ -93,7 +96,6 @@ void parse_instruction(char* line, instruction* inst){
 
 }
 
-
 instruction *interpretate(const char* path){
 
     FILE* fp = std::fopen(path,"r");
@@ -145,13 +147,15 @@ instruction *interpretate(const char* path){
     return instructions;   
 }
 
+
+
 /*
 int main(){
 
     int count = 16;
 
     instruction* program = interpretate("code_test.txt");
-    Procesador cpu;
+    //Procesador cpu;
 
     if (program) {
         for (int i = 0; i < count; ++i) {
@@ -178,4 +182,6 @@ int main(){
 }
 
 */
+
+
 	

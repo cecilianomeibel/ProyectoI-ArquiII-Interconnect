@@ -2,9 +2,11 @@
 #include <vector>
 #include <thread>
 #include <atomic>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
 #include "Cache.cpp"
 #include "interprete.cpp"
-
 
 class Procesador {
 private:
@@ -12,32 +14,52 @@ private:
     uint64_t latenciaCacheHit = 3;
     uint64_t latenciaCacheMiss = 6;
     uint64_t ciclosTransferenciaPorByte = 5;
-    uint64_t ciclosBroadcast = 50;
+    uint64_t ciclosBroadcast = 15;
     uint64_t ciclosInvAck = 10;  
     uint64_t ciclosWriteMem = 50;
-
+    uint64_t pc;                           // Contador de programa
+    
     Cache cache;  
-
     std::thread hilo;          // El hilo que ejecutará el procesador
     std::atomic<bool> activo;  // Para controlar el ciclo de vida del hilo
-
-
+    
+    std::queue<instruction> colaInstrucciones;
+    std::mutex mtxCola;
+    std::condition_variable cvCola;
+    
     void run() {
-        // Ejecución de las instrucciones
         while (activo) {
-            // Agregar la lógica para ejecutar instrucciones
+            instruction instr;
+            {
+                std::unique_lock<std::mutex> lock(mtxCola);
+                cvCola.wait(lock, [this](){ return !colaInstrucciones.empty() || !activo; });
+                
+                if (!activo) break;
+                
+                instr = colaInstrucciones.front();
+                colaInstrucciones.pop();
+            }
+            
+            ejecutarInstruccion(instr);
         }
-       
     }
-
+    
 
 public:
-    Procesador() : tiempoActual(0), activo(true) {
-        // Crea el hilo que ejecuta el método `run`
+    Procesador() : tiempoActual(0), activo(true), pc(0) {
         hilo = std::thread(&Procesador::run, this);
     }
 
-    // Método que ejecuta una instrucción
+    // Método para agregar instrucciones 
+    void agregarInstruccion(const instruction& instr) {
+        {
+            std::lock_guard<std::mutex> lock(mtxCola);
+            colaInstrucciones.push(instr);
+        }
+        cvCola.notify_one();
+    }
+
+    // Método que ejecuta una instrucción 
     void ejecutarInstruccion(const instruction& instr) {
         switch (instr.opcode) {
             case 0: // WRITE_MEM
@@ -47,7 +69,7 @@ public:
                 READ_MEM(instr.src, instr.addr, instr.size, instr.qos); 
                 break;
             case 2: // BROADCAST_INVALIDATE 
-                //BROADCAST_INVALIDATE(instr.src, instr.num_of_cache_lines, instr.qos); 
+                BROADCAST_INVALIDATE(instr.src, instr.cache_line, instr.qos); 
                 break;
             case 3:  // INV_ACK 
                 INV_ACK(instr.src, instr.qos);
@@ -67,6 +89,8 @@ public:
         }
     }
 
+    //Simular acceso a memoria
+
     void manejarAccesoMemoria(uint64_t direccion, uint32_t tam, const std::string& tipo) {
         bool hit = cache.access(direccion);
         if (hit) {
@@ -84,14 +108,14 @@ public:
 
 
     //-----------------
-    //FUNCION WRITE_MEM
+    //FUNCION WRITE_MEM   
     //-----------------
 
     void WRITE_MEM(uint8_t src, uint64_t addr, uint32_t numOfCacheLines, uint32_t startCacheLine, uint8_t qos) {
         // Se asume que datos a escribir provienen del caché del PE fuente
         std::cout << "[WRITE_MEM] PE #" << (int)src
                   << " escribiendo en dir 0x" << std::hex << addr
-                  << " con QoS: " << (int)qos
+                  << " con QoS: " << std::dec <<  (int)qos
                   << " utilizando " << numOfCacheLines
                   << " líneas de caché, comenzando desde la línea "
                   << startCacheLine << "\n";
@@ -149,7 +173,24 @@ public:
         std::cout << "[READ_MEM] Datos leídos y almacenados en la caché del PE #" << (int)src << "\n";
     }
 
-  
+
+    //----------------------------
+    //FUNCION BROADCAST_INVALIDATE
+    //----------------------------
+    void BROADCAST_INVALIDATE(uint8_t src, uint32_t cache_line, uint8_t qos) {
+        std::cout << "[BROADCAST_INVALIDATE] PE #" << (int)src 
+        << " invalida la línea de caché: " << cache_line
+        << " en todos los PEs con QoS: " << (int)qos 
+        << " => Tiempo inicial: " << tiempoActual << " ciclos\n";
+        
+        tiempoActual += ciclosBroadcast; // Tiempo para enviar el broadcast a todos los PEs
+        std::cout << "[BROADCAST_INVALIDATE] Invalidando línea " << cache_line  //Simular la invalidación de la línea de caché específica
+        << " en todos los PEs. Tiempo: " << tiempoActual << " ciclos\n";
+        std::cout << "[BROADCAST_INVALIDATE] Invalidación completada. Tiempo total: " 
+        << tiempoActual << " ciclos\n";
+    }
+    
+
     //---------------
     //FUNCION INV_ACK
     //---------------
@@ -157,7 +198,7 @@ public:
     void INV_ACK(uint8_t src, uint8_t qos) {
         std::cout << "Respuesta de invalidación recibida desde PE #" << (int)src
         << " con QoS: " << (int)qos << " Tiempo: " << tiempoActual << " ciclos\n";
-        tiempoActual += ciclosInvAck;
+        tiempoActual += ciclosInvAck;   //añadir aqui *numPEs
     }
 
     //--------------------
@@ -185,10 +226,11 @@ public:
         std::string estado = (status == 0x1) ? "OK" : "NOT_OK";
         std::cout << "[WRITE_RESP] Respuesta a escritura recibida por PE #" << (int)dest
         << " => estado: " << estado
-        << " (0x" << std::hex << (int)status << "), QoS: " << (int)qos
+        << " (0x" << std::dec << (int)status << "), QoS: " << (int)qos
         << " => Tiempo: " << tiempoActual << " ciclos\n";
         tiempoActual += 5; // 5 ciclos por procesar la respuesta
     }
+
 
 
     uint64_t getTiempoActual() const {
@@ -204,39 +246,36 @@ public:
     }
 
     void invalidateLine(uint64_t address) {
-    cache.invalidateLineByAddress(address);
+        cache.invalidateLineByAddress(address);
     }
 
-
-    // Detener el procesador y unir el hilo al final
     void detener() {
         activo = false;
+        cvCola.notify_all(); 
         if (hilo.joinable()) {
             hilo.join();
         }
     }
 
-
-    //Cerrar el hilo
     ~Procesador() {
         detener();
     }  
-
 };
 
-
- int main() {
+int main() {
     instruction* program = interpretate("code_test.txt");
     int count = 16;
     Procesador cpu;
 
+    // Se usa agregarInstruccion en lugar de ejecutarInstruccion
     for (int i = 0; i < count; ++i) {
-        cpu.ejecutarInstruccion(program[i]);
+        cpu.agregarInstruccion(program[i]);
     }
+
+    // Esperar a que el procesador termine 
+    std::this_thread::sleep_for(std::chrono::seconds(1));  //no estoy segura si ese sleep se puede usar aca 
 
     return 0;
 }
-
-
 
   
