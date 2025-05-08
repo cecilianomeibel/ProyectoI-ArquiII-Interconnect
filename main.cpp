@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdint>
 #include "interconnect/interconnect.hpp"
+#include "clk/clk.cpp"
 
 int main(int argc, char const *argv[])
 {
