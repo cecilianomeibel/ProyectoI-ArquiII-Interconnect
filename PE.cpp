@@ -6,7 +6,7 @@
 #include <mutex>
 #include <condition_variable>
 #include "Cache.cpp"
-#include "interprete.cpp"
+#include "instruction.hpp"
 
 class Procesador {
 private:
@@ -262,7 +262,7 @@ public:
     }  
 };
 
-int main() {
+/*int main() {
     instruction* program = interpretate("code_test.txt");
     int count = 16;
     Procesador cpu;
@@ -276,6 +276,5 @@ int main() {
     std::this_thread::sleep_for(std::chrono::seconds(1));  //no estoy segura si ese sleep se puede usar aca 
 
     return 0;
-}
-
+}*/
   
