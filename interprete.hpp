@@ -11,6 +11,6 @@
 // Declaraciones de funciones
 int analicer_opcode(char *text);
 void parse_instruction(char* line, instruction* inst);
-instruction* interpretate(const char* path);
+instruction* interpretate(const char* path, int* size);
 
 #endif

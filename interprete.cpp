@@ -75,7 +75,7 @@ void parse_instruction(char* line, instruction* inst){
 
 }
 
-instruction *interpretate(const char* path){
+instruction *interpretate(const char* path, int* size){
 
     FILE* fp = std::fopen(path,"r");
 
@@ -122,6 +122,7 @@ instruction *interpretate(const char* path){
     printf("%d \n",instructions[5].opcode);
 
     std::fclose(fp);
+    *size = i;
    
     return instructions;   
 }

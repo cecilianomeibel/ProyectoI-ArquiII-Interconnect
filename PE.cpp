@@ -35,7 +35,7 @@ private:
                 cv.wait(lock, [this](){ return ready; });
                 if(colaInstrucciones.empty()){
                     activo = false;
-                    finish = true; 
+                    //finish = true; 
                     break;
                 }
                 ready = false;

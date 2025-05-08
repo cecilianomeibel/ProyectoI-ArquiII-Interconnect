@@ -5,15 +5,48 @@
 #include "interprete.hpp"
 #include "clk/clk.hpp"
 
-int main(int argc, char const *argv[])
+int main()
 {
-    int count = 15;
-
-    instruction* program = interpretate("code_test.txt");
-    Procesador pe;
-
-    for (int i = 0; i < count; ++i) {
-        pe.agregarInstruccion(program[i]);
+    int size;
+    instruction* program = interpretate("code_test.txt", &size);
+    Procesador pe0;
+    Procesador pe1;
+    Procesador pe2;
+    Procesador pe3;
+    Procesador pe4;
+    Procesador pe5;
+    Procesador pe6;
+    Procesador pe7;
+    for (int i = 0; i < size; ++i) {
+        switch (program[i].src){
+        case 0:
+            pe0.agregarInstruccion(program[i]);
+            break;
+        case 1:
+            pe1.agregarInstruccion(program[i]);
+            break;
+        case 2:
+            pe2.agregarInstruccion(program[i]);
+            break;
+        case 3:
+            pe3.agregarInstruccion(program[i]);
+            break;
+        case 4:
+            pe4.agregarInstruccion(program[i]);
+            break;
+        case 5:
+            pe5.agregarInstruccion(program[i]);
+            break;
+        case 6:
+            pe6.agregarInstruccion(program[i]);
+            break;
+        case 7:
+            pe7.agregarInstruccion(program[i]);
+            break;
+        
+        default:
+            break;
+        }
     }
 
     std::thread clk(run_clk);
