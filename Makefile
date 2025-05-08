@@ -12,17 +12,20 @@ INTERCONNECT_OBJS = $(OBJDIR)/interconnect.o \
                     $(OBJDIR)/FIFO.o \
                     $(OBJDIR)/Priority.o
 
+CLK_OBJS = $(OBJDIR)/shared.o \
+           $(OBJDIR)/clk.o
+
 PE_OBJ = $(OBJDIR)/PE.o
 
 INTERPRETE_OBJ = $(OBJDIR)/interprete.o
 
-all: $(OBJDIR) $(INTERCONNECT_OBJS) $(PE_OBJ) $(INTERPRETE_OBJ) $(MAIN_OBJ)
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(MAIN_OBJ) $(INTERCONNECT_OBJS) $(PE_OBJ) $(INTERPRETE_OBJ) -pthread
+all: $(OBJDIR) $(INTERCONNECT_OBJS) $(PE_OBJ) $(INTERPRETE_OBJ) $(CLK_OBJS) $(MAIN_OBJ)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(MAIN_OBJ) $(INTERCONNECT_OBJS) $(PE_OBJ) $(CLK_OBJS) $(INTERPRETE_OBJ) -pthread
 
 $(MAIN_OBJ): $(MAIN)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(PE_OBJ): Cache.cpp instruction.hpp
+$(PE_OBJ): Cache.cpp instruction.hpp interconnect/interconnect.hpp clk/shared.hpp
 	$(CXX) $(CXXFLAGS) -c PE.cpp -o $(PE_OBJ) -pthread
 
 $(INTERPRETE_OBJ): instruction.hpp
@@ -30,6 +33,9 @@ $(INTERPRETE_OBJ): instruction.hpp
 
 $(INTERCONNECT_OBJS):
 	$(MAKE) -C interconnect
+
+$(CLK_OBJS):
+	$(MAKE) -C clk
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)

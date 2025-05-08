@@ -7,6 +7,8 @@
 #include <condition_variable>
 #include "Cache.cpp"
 #include "instruction.hpp"
+#include "clk/shared.hpp"
+#include "interconnect/interconnect.hpp"
 
 class Procesador {
 private:
@@ -24,15 +26,19 @@ private:
     std::atomic<bool> activo;  // Para controlar el ciclo de vida del hilo
     
     std::queue<instruction> colaInstrucciones;
-    std::mutex mtxCola;
-    std::condition_variable cvCola;
     
     void run() {
         while (activo) {
             instruction instr;
             {
-                std::unique_lock<std::mutex> lock(mtxCola);
-                cvCola.wait(lock, [this](){ return !colaInstrucciones.empty() || !activo; });
+                std::unique_lock<std::mutex> lock(mtx);
+                cv.wait(lock, [this](){ return ready; });
+                if(colaInstrucciones.empty()){
+                    activo = false;
+                    finish = true; 
+                    break;
+                }
+                ready = false;
                 
                 if (!activo) break;
                 
@@ -52,11 +58,7 @@ public:
 
     // Método para agregar instrucciones 
     void agregarInstruccion(const instruction& instr) {
-        {
-            std::lock_guard<std::mutex> lock(mtxCola);
-            colaInstrucciones.push(instr);
-        }
-        cvCola.notify_one();
+        colaInstrucciones.push(instr);
     }
 
     // Método que ejecuta una instrucción 
@@ -106,12 +108,26 @@ public:
         }
     } 
 
+    void exec_waiting(uint64_t time){
+        int count = 0;
+        while(count != time){
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait(lock, [this](){ return ready; });  
+            
+            if(clock_signal.load() == 1){
+                count++;
+            }
+            ready = false;
+        }
+    }
+
 
     //-----------------
     //FUNCION WRITE_MEM   
     //-----------------
 
     void WRITE_MEM(uint8_t src, uint64_t addr, uint32_t numOfCacheLines, uint32_t startCacheLine, uint8_t qos) {
+        Interconnect::getInstance().write_mem(src, addr, numOfCacheLines, startCacheLine, qos);
         // Se asume que datos a escribir provienen del caché del PE fuente
         std::cout << "[WRITE_MEM] PE #" << (int)src
                   << " escribiendo en dir 0x" << std::hex << addr
@@ -126,16 +142,20 @@ public:
                 tiempoActual += latenciaCacheHit;
                 std::cout << "[WRITE_MEM] HIT en dir 0x" << std::hex << addr + i * cache.getBlockSize()   
                           << " => Tiempo: " << std::dec << tiempoActual << " ciclos\n";
+                exec_waiting(latenciaCacheHit);
+                
             } else {
                 tiempoActual += latenciaCacheMiss;
                 tiempoActual += ciclosTransferenciaPorByte * cache.getBlockSize();
                 std::cout << "[WRITE_MEM] MISS en dir 0x" << std::hex << addr + i * cache.getBlockSize()
                           << " => Tiempo: " << std::dec << tiempoActual << " ciclos\n";
+                exec_waiting(latenciaCacheMiss + ciclosTransferenciaPorByte * cache.getBlockSize());
             }
         }
 
         // Agregar el tiempo de escritura en memoria
         tiempoActual += ciclosWriteMem;
+        exec_waiting(ciclosWriteMem);
         std::cout << "[WRITE_MEM] Finalizó la escritura en memoria. Tiempo total: " << tiempoActual << " ciclos\n";
     }
 
@@ -145,6 +165,7 @@ public:
     //-----------------
 
     void READ_MEM(uint8_t src, uint64_t addr, uint32_t size, uint8_t qos) {
+        Interconnect::getInstance().read_mem(src, addr, size, qos);
         std::cout << "[READ_MEM] PE #" << (int)src
                   << " leyendo en dir 0x" << std::hex << addr
                   << " de tamaño " << size << " bytes con QoS: "
@@ -161,12 +182,14 @@ public:
                 tiempoActual += latenciaCacheHit;
                 std::cout << "[READ_MEM] HIT en dir 0x" << std::hex << addr + i * blockSize   
                           << " => Tiempo: " << std::dec << tiempoActual << " ciclos\n";
+                exec_waiting(latenciaCacheHit);
             } else {
                 // Si es un MISS, suma la latencia del MISS y el tiempo de transferencia de datos
                 tiempoActual += latenciaCacheMiss;
                 tiempoActual += ciclosTransferenciaPorByte * blockSize;
                 std::cout << "[READ_MEM] MISS en dir 0x" << std::hex << addr + i * blockSize
                           << " => Tiempo: " << std::dec << tiempoActual << " ciclos\n";
+                exec_waiting(latenciaCacheMiss);
             }
         }
 
@@ -178,12 +201,14 @@ public:
     //FUNCION BROADCAST_INVALIDATE
     //----------------------------
     void BROADCAST_INVALIDATE(uint8_t src, uint32_t cache_line, uint8_t qos) {
+        Interconnect::getInstance().broadcast_invalidate(src, cache_line, qos);
         std::cout << "[BROADCAST_INVALIDATE] PE #" << (int)src 
         << " invalida la línea de caché: " << cache_line
         << " en todos los PEs con QoS: " << (int)qos 
         << " => Tiempo inicial: " << tiempoActual << " ciclos\n";
         
         tiempoActual += ciclosBroadcast; // Tiempo para enviar el broadcast a todos los PEs
+        exec_waiting(ciclosBroadcast);
         std::cout << "[BROADCAST_INVALIDATE] Invalidando línea " << cache_line  //Simular la invalidación de la línea de caché específica
         << " en todos los PEs. Tiempo: " << tiempoActual << " ciclos\n";
         std::cout << "[BROADCAST_INVALIDATE] Invalidación completada. Tiempo total: " 
@@ -196,9 +221,11 @@ public:
     //---------------
 
     void INV_ACK(uint8_t src, uint8_t qos) {
+        Interconnect::getInstance().inv_ack(src, qos);
         std::cout << "Respuesta de invalidación recibida desde PE #" << (int)src
         << " con QoS: " << (int)qos << " Tiempo: " << tiempoActual << " ciclos\n";
         tiempoActual += ciclosInvAck;   //añadir aqui *numPEs
+        exec_waiting(ciclosInvAck);
     }
 
     //--------------------
@@ -213,6 +240,7 @@ public:
         // Simula que estos datos (1 bloque) llegan desde memoria y se almacenan en caché
         uint32_t blockSize = cache.getBlockSize();
         tiempoActual += ciclosTransferenciaPorByte * blockSize;
+        exec_waiting(ciclosTransferenciaPorByte * blockSize);
         cache.access(data);  // Asume que se ha accedido/cargado el bloque
         std::cout << "[READ_RESP] Datos almacenados en la caché. Tiempo total: "
         << tiempoActual << " ciclos\n";
@@ -229,6 +257,7 @@ public:
         << " (0x" << std::dec << (int)status << "), QoS: " << (int)qos
         << " => Tiempo: " << tiempoActual << " ciclos\n";
         tiempoActual += 5; // 5 ciclos por procesar la respuesta
+        exec_waiting(5);
     }
 
 
@@ -251,7 +280,7 @@ public:
 
     void detener() {
         activo = false;
-        cvCola.notify_all(); 
+        cv.notify_all(); 
         if (hilo.joinable()) {
             hilo.join();
         }
@@ -261,20 +290,4 @@ public:
         detener();
     }  
 };
-
-/*int main() {
-    instruction* program = interpretate("code_test.txt");
-    int count = 16;
-    Procesador cpu;
-
-    // Se usa agregarInstruccion en lugar de ejecutarInstruccion
-    for (int i = 0; i < count; ++i) {
-        cpu.agregarInstruccion(program[i]);
-    }
-
-    // Esperar a que el procesador termine 
-    std::this_thread::sleep_for(std::chrono::seconds(1));  //no estoy segura si ese sleep se puede usar aca 
-
-    return 0;
-}*/
   

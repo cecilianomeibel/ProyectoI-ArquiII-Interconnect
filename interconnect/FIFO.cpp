@@ -12,8 +12,15 @@ class FIFO {
         }
 
         msg getMsg(){
-            msg message = queue.front();
-            queue.pop();
-            return message;
+            if(!queue.empty()){
+                msg message = queue.front();
+                queue.pop();
+                return message;
+            }
+            return {NULL};
+        }
+
+        bool empty(){
+            return queue.empty();
         }
 };

@@ -3,28 +3,25 @@
 #include "interconnect/interconnect.hpp"
 #include "PE.cpp"
 #include "interprete.hpp"
+#include "clk/clk.hpp"
 
 int main(int argc, char const *argv[])
 {
-    int count = 16;
+    int count = 15;
 
     instruction* program = interpretate("code_test.txt");
     Procesador pe;
-    Interconnect interconnect;
-    interconnect.WRITE_MEM(1,1,1,1);
-    interconnect.WRITE_MEM(2,2,2,2);
-    interconnect.WRITE_MEM(1,1,1,3);
-    interconnect.WRITE_MEM(1,1,1,4);
 
     for (int i = 0; i < count; ++i) {
         pe.agregarInstruccion(program[i]);
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::thread clk(run_clk);
+    clk.join();
 
-    //Mover los calendarizadores a publicos en interconnect.cpp para pruebas.
-    /*for(int i=0; i < 4; i++){
-        std::cout << "Mensaje FIFO: " << std::dec << (int)interconnect.fifo.getMsg().qos << std::endl;
-    }*/
+    for(int i=0; i<5; i++){
+
+        std::cout << "PE src: " << (int)Interconnect::getInstance().fifo.getMsg().src << std::endl;
+    }
     return 0;
 }

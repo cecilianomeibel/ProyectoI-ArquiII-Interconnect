@@ -47,27 +47,3 @@ public:
 
 
 };
-
-
-/*
-int main() {
-    Cache miCache;
-
-    // Simular accesos a memoria
-    miCache.access(0xF004);  // Miss
-    miCache.access(0x110);  // Miss
-    miCache.access(0x100);  // Hit
-    miCache.access(0x200);  // Miss
-
-    // Mostrar el contenido de la caché
-    std::cout << "Contenido de la caché:\n";
-    miCache.printCache();
-    miCache.access(0x200);  // Miss
-
-    // Mostr
-    return 0;
-}*/ 
-
-
-
-
